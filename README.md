@@ -4,8 +4,10 @@ This project is to implement several graph signals algorithms for use in a deep 
 
 ## Use 
 
-This is meant to be able to be used in any layer of the network. If you want to preproccess the data with some convolutional layers and maybe a dense layer, then implement a semisupervised graph algorithm, this should accomplish that. This requires an op class that stores the data in a linear array with an `add` op and then, once we have enough we compile this into an M/KD/cover-tree. Then we can make fast queries and use graph convolutional algorithms at speed, after the network has extracted some features.
+This is meant to be able to be used in any layer of the network. If you want to preproccess the data with some convolutional layers and maybe a dense layer, then implement a semisupervised graph algorithm, this should accomplish that. This requires an op class that stores the data in a linear array with an `add` op and then, once we have enough we can "compile" this into an M/KD/cover-tree. Then we can make fast queries and use graph convolutional algorithms at speed, after the network has extracted some features.
 
 ## Issues
 
-The current implementation uses a linear search over an array. This is not ideal. This needs to be replaced with an M-tree, internal to tensorflow and a set of tightly. This will require an extension written in C++. 
+The current implementation uses a linear search over an array that is filled in numpy, not tensorflow, then the compile "op" moves the numpy array into tensorflow. This is not ideal. This needs to be replaced with an M-tree, internal to tensorflow and a set of tightly. This will require an extension written in C++. 
+
+Also, the primary graph-to-features extractors, distance matrices and graphlet fields, are slow and cumberson. If there are efficient kernels to do this, please let me know.
