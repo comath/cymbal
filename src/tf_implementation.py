@@ -123,62 +123,62 @@ class tfknn(object):
 			results.append(singlePointKNN(x,self.tfPointCloud,K))
 		return tf.stack(results,0)
 
-	def matrixOp(self,queryPoints, K, graphToMatrix, returnPoints = False):
-		"""
-		Returns the distance/adjacency/laplacian matrix for the k nearest points along with the associated points
-		"""
-		splitQuery = tf.unstack(queryPoints)
-		results = []
-		if returnPoints:
-			retPoints = []
+def matrixOp(self,localPoints, K, graphToMatrix, returnPoints = False):
+	"""
+	Returns the distance/adjacency/laplacian matrix for the k nearest points along with the associated points
+	"""
+	splitQuery = tf.unstack(localPoints)
+	results = []
+	if returnPoints:
+		retPoints = []
 
-		for x in splitQuery:
-			points = singlePointKNN(x,self.tfPointCloud,K)
-			if returnPoints:
-				retPoints.append(points)
-			localMatrix = graphToMatrix(points,K)
-			results.append(localMatrix)
-		distMatrices = tf.stack(results,0)
+	for x in splitQuery:
+		points = singlePointKNN(x,self.tfPointCloud,K)
 		if returnPoints:
-			retPoints = tf.stack(retPoints,0)
-			return distMatrices, retPoints
-		return distMatrices
+			retPoints.append(points)
+		localMatrix = graphToMatrix(points,K)
+		results.append(localMatrix)
+	distMatrices = tf.stack(results,0)
+	if returnPoints:
+		retPoints = tf.stack(retPoints,0)
+		return distMatrices, retPoints
+	return distMatrices
 
-	def fieldsOp(self,queryPoints,numFields,fieldSize,stepSize, graphToMatrix,returnPoints = None):
-		"""
-		Returns the set of hyperlocal fields I mostly use the work
-		"""
-		returnFields = []
+def fieldsOp(self,localPoints,numFields,fieldSize,stepSize, graphToMatrix,returnPoints = None):
+	"""
+	Returns the set of hyperlocal fields I mostly use the work
+	"""
+	returnFields = []
+	if returnPoints:
+		retPoints = []
+	splitQuery = tf.unstack(localPoints)
+	for x in splitQuery:
+		# Get the local area
+		localPoints = singlePointKNN(x,self.tfPointCloud,numFields*fieldSize*stepSize)
 		if returnPoints:
-			retPoints = []
-		splitQuery = tf.unstack(queryPoints)
-		for x in splitQuery:
-			# Get the local area
-			localPoints = singlePointKNN(x,self.tfPointCloud,numFields*fieldSize*stepSize)
-			if returnPoints:
-				retHLPoints = []
-			hyperlocalMatrices = []
-			"""
-			Make the numFields worth of tiny adj matrices, and save the points, if we need it.
+			retHLPoints = []
+		hyperlocalMatrices = []
+		"""
+		Make the numFields worth of tiny adj matrices, and save the points, if we need it.
 
-			This cannot do fancy ordering, just straight up distance.
-			"""
-			for i in range(numFields):
-				# Get the hyperlocal points, stepping by stepSize
-				hyperlocalPoints = singlePointKNN(localPoints[i*stepSize,:],localPoints,fieldSize)
-				if returnPoints:
-					retHLPoints.append(hyperlocalPoints)
-				# Turn the set of hyperlocal points into a distance/adj/laplacian matrix
-				distMatrix = graphToMatrix(hyperlocalPoints,fieldSize)
-				# Save the tiny matrix
-				hyperlocalMatrices.append(distMatrix)
+		This cannot do fancy ordering, just straight up distance.
+		"""
+		for i in range(numFields):
+			# Get the hyperlocal points, stepping by stepSize
+			hyperlocalPoints = singlePointKNN(localPoints[i*stepSize,:],localPoints,fieldSize)
 			if returnPoints:
-				retPoints.append(tf.stack(retHLPoints,0))
-			# Stack the tiny matrices
-			hyperlocalMatrices = tf.stack(hyperlocalMatrices,0)
-			returnFields.append(hyperlocalMatrices)
+				retHLPoints.append(hyperlocalPoints)
+			# Turn the set of hyperlocal points into a distance/adj/laplacian matrix
+			distMatrix = graphToMatrix(hyperlocalPoints,fieldSize)
+			# Save the tiny matrix
+			hyperlocalMatrices.append(distMatrix)
 		if returnPoints:
-			retPoints = tf.stack(retPoints,0)
-			return tf.stack(returnFields,0), retPoints
-		# Stack the stacks of tiny matrices
-		return tf.stack(returnFields,0)
+			retPoints.append(tf.stack(retHLPoints,0))
+		# Stack the tiny matrices
+		hyperlocalMatrices = tf.stack(hyperlocalMatrices,0)
+		returnFields.append(hyperlocalMatrices)
+	if returnPoints:
+		retPoints = tf.stack(retPoints,0)
+		return tf.stack(returnFields,0), retPoints
+	# Stack the stacks of tiny matrices
+	return tf.stack(returnFields,0)

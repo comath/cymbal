@@ -1,0 +1,164 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\pdfoutput=1
+\usepackage{tikz}
+\usetikzlibrary{matrix,arrows,decorations.pathmorphing}
+\usepackage{tikz-cd}
+\usepackage{amsmath,amsfonts,amsthm,amssymb}
+\usepackage{dsfont}
+\usepackage{graphicx}
+
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+
+
+\usepackage{comment}
+
+\title{Neural Graph Pseudocode}
+\author{Sven Cattell}
+
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\K}{\mathbb{K}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\aA}{\mathcal{A}}
+\newcommand{\aR}{\mathcal{R}}
+\newcommand{\aI}{\mathcal{I}}
+
+\newcommand{\aP}{\mathcal{P}}
+\newcommand{\aS}{\mathcal{S}}
+\newcommand{\ag}{\mathfrak{g}}
+\newcommand{\ab}{\mathfrak{b}}
+\newcommand{\an}{\mathfrak{n}}
+\newcommand{\ah}{\mathfrak{h}}
+\newcommand{\au}{\mathfrak{u}}
+\newcommand{\ap}{\mathfrak{p}}
+\newcommand{\F}{\mathcal{F}}
+\newcommand{\G}{{\mathcal{G}}}
+\newcommand{\aH}{\mathcal{H}}
+\newcommand{\U}{\mathcal{U}}
+\newcommand{\aF}{\mathcal{F}(\mathcal{H})}
+\newcommand{\maps}{\text{Maps}}
+\newcommand{\Hom}{\text{Hom}}
+\newcommand{\Chi}{\mathds{1}}
+
+\newtheorem{prop}{Proposition}
+\newtheorem{claim}{Claim}
+\newtheorem{defi}{Definition}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{corollary}{Corollary}[theorem]
+\newtheorem{lemma}[theorem]{Lemma}
+
+\makeatletter
+\def\BState{\State\hskip-\ALG@thistlm}
+\makeatother
+
+\begin{document}
+\begin{algorithm}
+\caption{Generate Neural Graph Adjacency Tensor: Training Time}\label{training}
+\begin{algorithmic}[1]
+\Require{An array of $n$-dimensional binary vectors, $\{v_i\}_{i = 1}^{k}$, a matrix $S$ of shape $s \times n$, a skip index $t$}{}
+
+\Procedure{\emph{Get Difference Tensor}}{}
+\State $A^{\text{temp}} \gets \text{Empty } k \times k \times n \text{ array}$
+\For{$i = 1, \dots, k$} 
+\For{$j = 1, \dots, k$} 
+\State $A_{i,j}^{\text{temp}} \gets |v_i - v_j|$
+\EndFor
+\EndFor
+\EndProcedure
+\Procedure{\emph{Get Adjacency Tensor}}{}
+\State $A \gets \text{Zero } (s+1) \times k \times k \text{ tensor}$
+\For{$i = 1, \dots, k$} 
+\For{$j = 1, \dots, k$} 
+\State $A_{0,j,j} \gets \text{Population}(A_{i,j}^{\text{temp}}) $
+\For{$r = 1, \dots, s$}
+\If{$r \neq t$}
+\State $A_{r,i,j} \gets S_r \cdot A_{i,j}^{\text{temp}}$
+\State $A_{t,i,j} \gets A_{t,i,j} + A_{r,i,j}$
+\EndIf
+\EndFor
+\State $A_{t,i,j} \gets \frac{1}{s}A_{t,i,j}$
+\EndFor
+\EndFor
+\EndProcedure
+\Return{$A$, The adjacency tensor, of shape $k \times k \times (s + 1)$.}{}
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+\caption{Generate Neural Graph Adjacency Tensor: Run Time}\label{run}
+\begin{algorithmic}[1]
+\Require{An array of $n$-dimensional binary vectors, $\{v_i\}_{i = 1}^{k}$, a matrix $S$ of shape $s \times n$}{}
+
+\Procedure{\emph{Get Difference Tensor}}{}
+\State $A^{\text{temp}} \gets \text{Empty } k \times k \times n \text{ array}$
+\For{$i = 1, \dots, k$} 
+\For{$j = 1, \dots, k$} 
+\State $A_{i,j}^{\text{temp}} \gets |v_i - v_j|$
+\EndFor
+\EndFor
+\EndProcedure
+\Procedure{\emph{Get Adjacency Tensor}}{}
+\State $A \gets \text{Zero } (s+1) \times k \times k \text{ tensor}$
+\For{$i = 1, \dots, k$} 
+\For{$j = 1, \dots, k$} 
+\State $A_{0,j,j} \gets \text{Population}(A_{i,j}^{\text{temp}}) $
+\For{$r = 1, \dots, s$}
+\State $A_{r,i,j} \gets S_r \cdot A_{i,j}^{\text{temp}}$
+\EndFor
+\EndFor
+\EndFor
+\EndProcedure
+\Return{$A$, The adjacency tensor, of shape $k \times k \times (s + 1)$.}{}
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+\caption{Get Fields Tensor from Point Cloud}\label{fields}
+\begin{algorithmic}[1]
+\Require{A query vector $q$. An array of vectors, $\{v_i\}_{i = 1}^{N}$, a matrix $S$, a step size $f_s$, number of fields $f_n$, and field size $f_m$, a \emph{GraphData} procedure}{}
+
+\Procedure{}{}
+
+\State $\{w_i\}_{i = 1}^{2 f_s f_n f_m} \gets  2 f_s f_n f_m \text{ nearest neighbors to } q \text{, sorted by distance}$
+\State $w_0 \gets q$
+\State $F \gets \text{ an empty tensor}$
+\For{$i = 0, \dots, f_n-1$}
+\State $\{u_i\}_{i = 1}^{f_m} \gets f_m \text{ nearest neighbors to } w_{i f_s} \text{ in } \{w_i\} \text{, sorted by distance}$
+\State $F_i \gets \text{\emph{GraphData}}(\{u_i\}_{i = 1}^{f_m})$
+
+\EndFor
+\EndProcedure
+\Return{$F$, The fields array for $q$.}{}
+\end{algorithmic}
+\end{algorithm}
+
+
+\begin{algorithm}
+\caption{Generate Novel Class Detector Training Data}
+\begin{algorithmic}[1]
+\Require{A function that returns a uninitialized \emph{Model}, a training procedure \emph{Train}, a chosen layer $L$, a labeled training set consisting of $s$ classes $X = \{X_1, \dots X_s\}$}{}
+
+\Procedure{}{}
+\For{$i = 1,\dots,s$}
+\State $M_i \gets \text{New \emph{Model}}$
+\State $X_\text{Normal} = \{X_1, \dots, X_{i-1}, X_{i+1}, \dots X_s\}$
+\State $X_\text{Novel} = \{X_1, \dots, X_{i-1}, X_{i+1}, \dots X_s\}$
+\State $M_i \gets \text{\emph{Train}}(M_i,X_{\text{Normal}})$
+\State $V_{i,\text{Normal}} \gets X_\text{Normal} \text{ evaluated up to layer } L \text{ with } M_i$
+\State $V_{i,\text{Novel}} \gets X_\text{Novel} \text{ evaluated up to layer } L \text{ with } M_i$
+\State $S_i \gets \text{Weights Matrix at layer } L+1 \text{ of } M_i$
+\State $F_{i,\text{Normal}},F_{i,\text{Novel}} \gets (V_{i,\text{Normal}},V_{i,\text{Novel}},S_i) \text{ processed by algorithm \ref{fields}}$
+\EndFor
+\State $F_{\text{Normal}} \gets \bigcup_{i=1}^s F_{i,\text{Normal}}$
+\State $F_{\text{Novel}} \gets \bigcup_{i=1}^s F_{i,\text{Novel}}$
+\EndProcedure
+\Return{$\{F_{\text{Normal}},F_{\text{Novel}}\}$}{}
+\end{algorithmic}
+\end{algorithm}
+
+\bibliographystyle{plain}
+\bibliography{references}
+\end{document}
