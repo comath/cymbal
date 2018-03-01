@@ -33,7 +33,7 @@ further proccessing in the rest of TF.
 
 sess = tf.Session()
 testKnn = tfknn(100,3,sess)
-queryOp = testKnn.pointQueryOp(feeder,3)
+queryOp = testKnn.knnOp(feeder,3)
 # Returns a function that makes distance matrices from some points:
 distMatrix = l2DistMatrix()
 # Returns a function that makes distance matrices from some points, then puts it thru the gaussian kernel:

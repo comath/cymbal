@@ -16,8 +16,18 @@ This needs to be stripped down to not deal with adversarial classes, but just no
 
 """
 
+def evalWide(op,feeder,dataForProcess,batchSize):
+	"""
+	Meant to batch out processes that have too much data to fit in memory at once.  
+	"""
+	trainingDataProcessed = sess.run(op,feed_dict={tf_X:dataForProcess[0:batchSize,]})
+	for i in range(batchSize,dataForProcess.shape[0],batchSize):
+		nextBatch = sess.run(op,feed_dict={tf_X:dataForProcess[i:i+batchSize,]})
+		np.concatenate([trainingDataProcessed,nextBatch])
+	return trainingDataProcessed
+
 class novelMetaNetworkHelper():
-	def __init__(self,trainingDataFilter, modelMaker=None, trainingModels=None, targetLabels = None):
+	def __init__(self,trainingData,trainingLabels, layer, modelMaker=None, trainingModels=None, targetLabels = None):
 		
 		if targetLabels is None:
 			self.targetLabels = list(range(trainingDataFilter.labels.shape[1]))
@@ -32,11 +42,11 @@ class novelMetaNetworkHelper():
 		self.adversarialDataMakers = []
 		self.noiseMaker = None
 		self.trainingDataFilter = trainingDataFilter
+		self.layer = layer
+
 	def trainTrainingModels(self,epochs,batch_size):
 		for i,trainingModel in self.trainingModels.iteritems():
-			novelData, normalData = self.trainingDataFilter.splitDataByClass([i])
-			novelLabels, normalLabels = self.trainingDataFilter.splitLabelsByClass([i])
-
+			normalData, normalLabels = removeClasses(trainingData,trainingLabels,[i])
 			trainingModel.fit(normalData,normalLabels, epochs=epochs, batch_size=batch_size)
 
 	def save(self,prefix):
@@ -47,7 +57,7 @@ class novelMetaNetworkHelper():
 		self.trainingModels = {}
 		for i in self.targetLabels:
 			self.trainingModels[i] = load_model(prefix + "trNovel-" + str(i)+".model")
-
+"""
 	def addAdversarialMaker(self,adversarialDataMaker):
 		self.adversarialDataMakers.append(adversarialDataMaker)
 
@@ -55,90 +65,69 @@ class novelMetaNetworkHelper():
 		self.noiseMaker = noiseMaker
 		self.numNoiseRepeats = numNoiseRepeats
 		self.novelClassNoise = novelClassNoise
-
-	def makeTrainingFeaturesOp(self,):	
-
-		self.layer = layer
-		self.graphMakers = {}
-
-		for i in self.targetLabels:
-			trainingModel = self.trainingModels[i]
-
-			novelData, normalData = self.trainingDataFilter.splitDataByClass([i])
-			novelIndexes, normalIndexes = self.trainingDataFilter.splitIndexesByClass([i])
-			print('Adding training data to neural map and neural graph.')
-			self.graphMakers[i] = nnGraph(trainingModel, points = normalData, unitalSigma = unitalSigma, layer = self.layer, selectorSigma = selectorSigma)
-
-			numTypes = 2
-			if not len(self.adversarialDataMakers) == 0:
-				numTypes += 1
-
-			print('Preprocessing the training data')
-			self.graphMakers[i].setTrainingParameters(
-				numTypes,
-				batchSize,
-				fieldSize,
-				stepSize,
-				numFields,
-				embeddingSize,
-				paddingRatio,
-				omittedSelector = i,
-				layer=self.layer)
-			print('Adding the artificial normal data')
-			self.graphMakers[i].preprocessMetaTrainingData(normalData,0,layer = self.layer)
-			print('Adding the artificial novel data')
-			self.graphMakers[i].preprocessMetaTrainingData(novelData,1,layer = self.layer)
-
-			if not self.noiseMaker is None:
-				for j in range(self.numNoiseRepeats):
-					print('Adding the noisy artificial normal data')
-					self.graphMakers[i].preprocessMetaTrainingData(self.noiseMaker(normalData),0,layer = self.layer)
-					if self.novelClassNoise:
-						print('Adding the noisy artificial novel data')
-						self.graphMakers[i].preprocessMetaTrainingData(self.noiseMaker(novelData),1,layer = self.layer)
-
-
-			for adm in  self.adversarialDataMakers:
-				print('Adding the adversarial examples generated from the artificial normal data')
-				self.graphMakers[i].preprocessMetaTrainingData(adm(trainingModel,normalData),2,layer = self.layer)
-
-
-		self.currentGraph = 0
-
-	def epochLen(self):
-		epochLen = 0
-		for i, graph in graphMakers.iteritems():
-			epochLen = epochLen + graph.epochLen()
-
-	def getFieldsBatch(self):
-		batch = self.graphMakers[self.currentGraph % len(self.targetLabels)].createTrainingFieldsBatch(layer=self.layer)
-		self.currentGraph += 1
-		return batch
-
-	def getEmbeddedBatch(self):
-		batch = self.graphMakers[self.currentGraph % len(self.targetLabels)].createTrainingEmbeddedBatch(layer=self.layer)
-		self.currentGraph += 1
-		return batch
-
-	def getEmbeddedData(self,
-		data,
+"""
+	def getFieldsFeatures(self,
+		unitalSigma,
+		selectorSigma,
 		fieldSize,
-		embeddingSize,
-		stepSize=1,
-		numFields=1,
-		paddingRatio=2,
-		layer=None):
+		stepSize,
+		numFields,
+		sess,
+		batchSize=500):
+		"""
+		Currently produces the neural graph weights tensor in a fields style output. This is an implementation of algorithm 4 in the pseudocode.
+		"""
+		fullyProcessedGraphData = None
+		fullyProcessedGraphLabels = None
 
-		unitEmbedding = np.zeros([0,numFields,fieldSize,embeddingSize],dtype=np.float32)
-		selectorEmbedding = np.zeros([0,numFields,self.trainingDataFilter.dim(),fieldSize,embeddingSize],dtype=np.float32)
+		with tf.Graph() as tf_graph:
+			with tf.Session() as sess:
+				for i,trainingModel in self.trainingModels.iteritems():
+					
+					hyperplaneMatrix, hyperplaneBias = GetHyperplaneMat(trainingModel, layer)
+					selectionMat,selectionBias = GetSelectionWeights(trainingModel, layer)
 
-		for gm in self.graphMakers:
-			testBatch = targetNeuralGraphMaker.graphletEmbeddedBatch(
-				data,
-				fieldSize,
-				embeddingSize,
-				stepSize = stepSize,
-				numFields = numFields,
-				layer=targetLayer)
+					tf_hyperplaneMatrix = tf.Variable(hyperplaneMatrix)
+					tf_hyperplaneBias = tf.Variable(hyperplaneBias)
+					tf_selectionMat = tf.Variable(selectorMatrix)
+					
+					tf_X = tf.placeholder(tf.float32,[None,hyperplaneMatrix.shape[0]],name='UnitInput')
+					# Put a step edge function on this:
+					tf_evalLevel = tf.matmul(tf_X,hyperplaneMatrix) + hyperplaneBias
+					sess.run([tf_selectionMat.inializer,tf_hyperplaneMatrix.inializer,tf_hyperplaneBias.inializer])
 
-			testFeedDict = {unitX:testBatch["unit"], selectorX: testBatch["selector"]}
+					
+					# We need to get the layer below to ensure that we don't have an activation function. If it's RELU, that's fine, but 
+					trainingDataPreLevel = getActivations(trainingModel, trainingData, self.layer - 1, batchSize = batchSize)
+					trainingDataProcessed = evalWide(tf_evalLevel,tf_X,trainingDataPreLevel)
+
+					"""
+					All the ducks are in a row. We can start the algorithm now
+					"""
+
+					normalData, normalLabels = removeClasses(trainingDataProcessed,trainingLabels,[i])
+					novelData, novelLabels = leaveClasses(trainingDataProcessed,trainingLabels,[i])
+
+					tempBallTree = npknn(normalData.shape[0], normalData.shape[1], sess)
+					tempBallTree.add(normalData)
+					tempBallTree.compile(20)
+
+					tf_graphInput = tf.placeholder(tf.float32,[None,fieldSize*stepSize*numFields,hyperplaneMatrix.shape[0]],name='UnitInput')
+					gdp = {"selectorMatrix":tf_selectionMat,"averageIndex":i}
+
+					fields = fieldsOp(tf_graphInput,numFields,fieldSize,stepSize, neuralGraphTensor,gdp)
+
+					normalGraphData = evalWide(fields,tf_graphInput,tempBallTree.knnOp(normalData))
+					novelGraphData = evalWide(fields,tf_graphInput,tempBallTree.knnOp(novelData))
+
+					normalGraphLabels = np.zeros(normalGraphData.shape[0])
+					novelGraphLabels = np.ones(novelGraphData.shape[0])
+
+					if fullyProcessedGraphData is None:
+						fullyProcessedGraphData = np.concatenate([normalGraphData,novelGraphData])
+						fullyProcessedGraphLabels = np.concatenate([normalGraphLabels,novelGraphLabels])
+					else:
+						fullyProcessedGraphData = np.concatenate([fullyProcessedGraphData,normalGraphData,novelGraphData])
+						fullyProcessedGraphLabels = np.concatenate([fullyProcessedGraphLabels,normalGraphLabels,novelGraphLabels])
+
+		return fullyProcessedGraphData, fullyProcessedGraphLabels

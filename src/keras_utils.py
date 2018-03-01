@@ -57,7 +57,7 @@ def getActivations(model, X_batch, layer_idx, batchSize = 500):
 	else:
 		return X_batch
 
-def GetHyperplaneMat(model, layer):
+def GetHyperplaneWeights(model, layer):
 	"""
 	Returns the weights of the current layer
 	"""
@@ -66,7 +66,7 @@ def GetHyperplaneMat(model, layer):
 	hyperplaneMat, hyperplaneBias = denceLayers[layer].get_weights()
 	return hyperplaneMat,hyperplaneBias
 
-def GetSelectionMat(model, layer):
+def GetSelectionWeights(model, layer):
 	"""
 	Returns the weights of the next layer.
 	"""
@@ -76,4 +76,4 @@ def GetSelectionMat(model, layer):
 	if nextDenseLayer is None:
 		raise AttributeError("No next layer")
 	selectionMat, selectionBias = denceLayers[nextDenseLayer].get_weights()
-	return selectionMat
+	return selectionMat,selectionBias

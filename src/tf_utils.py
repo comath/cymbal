@@ -11,7 +11,7 @@ def singlePointKNN(input,pointCloud,K):
 	return tf.gather(pointCloud,indices)
 
 
-def fieldsOp(self,arrayOfLocal,numFields,fieldSize,stepSize, graphToMatrix,returnPoints = None):
+def fieldsOp(arrayOfLocal,numFields,fieldSize,stepSize, graphToMatrix,graphToMatrixParameters,returnPoints = None):
 	"""
 	Returns the set of hyperlocal fields I mostly use in the work. Takes in the parameters and the tensor 	
 	"""
@@ -35,7 +35,7 @@ def fieldsOp(self,arrayOfLocal,numFields,fieldSize,stepSize, graphToMatrix,retur
 			if returnPoints:
 				retHLPoints.append(hyperlocalPoints)
 			# Turn the set of hyperlocal points into a distance/adj/laplacian matrix
-			distMatrix = graphToMatrix(hyperlocalPoints,fieldSize)
+			distMatrix = graphToMatrix(hyperlocalPoints,graphToMatrixParameters)
 			# Save the tiny matrix
 			hyperlocalMatrices.append(distMatrix)
 		if returnPoints:
@@ -49,7 +49,7 @@ def fieldsOp(self,arrayOfLocal,numFields,fieldSize,stepSize, graphToMatrix,retur
 	# Stack the stacks of tiny matrices
 	return tf.stack(returnFields,0)
 
-def matrixOp(self,arrayOfLocal, K, graphToMatrix, returnPoints = False):
+def matrixOp(arrayOfLocal, graphToMatrix, graphToMatrixParameters, returnPoints = False):
 	"""
 	Returns the distance/adjacency/laplacian matrix for the k nearest points along with the associated points
 	"""
@@ -62,7 +62,7 @@ def matrixOp(self,arrayOfLocal, K, graphToMatrix, returnPoints = False):
 
 		if returnPoints:
 			retPoints.append(localPoints)
-		localMatrix = graphToMatrix(localPoints,K)
+		localMatrix = graphToMatrix(localPoints,graphToMatrixParameters)
 		results.append(localMatrix)
 	distMatrices = tf.stack(results,0)
 	if returnPoints:

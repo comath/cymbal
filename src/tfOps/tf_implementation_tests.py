@@ -36,7 +36,7 @@ class nearestNeighborsTest(tf.test.TestCase):
 	def test_nearest_queryOp(self):
 		"""Checks the nearest neighbors against the BallTree from scikitlearn"""
 		with self.test_session() as sess:
-			x = self.testKnn.pointQueryOp(self.feeder5,self.numNhbrs)
+			x = self.testKnn.knnOp(self.feeder5,self.numNhbrs)
 			tf_nrstNbhrs = sess.run(x,feed_dict={self.feeder5:self.X[0:self.numQuery,]})
 			self.assertAllClose(tf_nrstNbhrs, self.nrstNbhrs)
 

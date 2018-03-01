@@ -46,7 +46,7 @@ class tfknn(object):
 		self.npPointCloud = np.zeros([0,self.pointDim],dtype= np.float32)
 
 
-	def pointQueryOp(self,queryPoints,K):
+	def knnOp(self,queryPoints,K):
 		"""
 		returns the nearest K points to each of the points in query points
 		"""
